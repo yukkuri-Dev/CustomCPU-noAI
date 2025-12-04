@@ -48,23 +48,10 @@ int RAM_init() {
 
         // 初期データをコピー（テスト用）
         uint32_t init_data[4*19] = {
-            0x00000045,0x00000000,0x00000000,0x00000000,
-            0x00000010,0x00000006,0x00000004,0x00000000,
-            0x0FFFFFFF,0x00000006,0x000000FF,0x0000000B,
-            0x0FFFFFFF,0x00000005,0x0000000E,0x00000001,
-            0x0FFFFFFF,0x00000001,0x0000000E,0x0000000F,
-            0x0FFFFFFF,0x00000000,0x00000000,0x00000000,
-            0x00000000,0x00000000,0x00000000,0x00000000,
-            0x00000000,0x00000000,0x00000000,0x00000000,
-            0x00000000,0x00000000,0x00000000,0x00000000,
-            0x00000000,0x00000000,0x00000000,0x00000000,
-            0x00000000,0x00000000,0x00000000,0x00000000,
-            0x00000000,0x00000000,0x00000000,0x00000000,
-            0x00000000,0x00000000,0x00000000,0x00000000,
-            0x00000000,0x00000000,0x00000000,0x00000000,
-            0x00000000,0x00000000,0x00000000,0x00000000,
-            0x00000000,0x00000000,0x00000000,0x00000000,
-            0x000000FF,0x00000000,0x00000000,0x00000000,
+            0x00000053,0xD000FF0D,0x00000001,0x00000000,
+            0x0FFFFFFF,0x00000004,0x0000000E,0x00000002,//8
+            0x00000052,0xD000FF0D,0x00000001,0x00000000,
+            0x0FFFFFFF,0x00000004,0x00000000,0x00000000,//10
             0xFFFFFFFF,0x0FFFFFFF,0x00000000,0x00000000
         };
         for(int i = 0; i < 4*19; i++) {
@@ -152,6 +139,18 @@ int Run() {
     case 0x00000045: // Not
         CPU_GPR[4] = ~CPU_GPR[1];
         break;
+    case 0x00000050: // SHL
+        CPU_GPR[4] = CPU_GPR[1] << CPU_GPR[2];
+        break;
+    case 0x00000051: // SHR
+        CPU_GPR[4] = CPU_GPR[1] >> CPU_GPR[2];
+        break;
+    case 0x00000052:// ROL
+        CPU_GPR[4] = (CPU_GPR[1] << CPU_GPR[2]) | (CPU_GPR[1] >> (32 - CPU_GPR[2]));
+        break;
+    case 0x00000053:// ROR
+        CPU_GPR[4] = (CPU_GPR[1] >> CPU_GPR[2]) | (CPU_GPR[1] << (32 - CPU_GPR[2]));
+        break;
     case 0xFFFFFFFF: // エミュレーター用強制停止命令
         printf("[!]Emulator Debugging instruction!:PC is %08X\nHow many times?:%08X\n", CPU_PC, CPU_PC / 4);
         printf("====[What's happen?]====\n");
@@ -172,6 +171,7 @@ int Run() {
         printf("Emulator is supported instructions below:\n");
         printf("ADD(0x00000001), SUB(0x00000002),\nMOV(0x00000010), LOAD(0x00000020),\n STORE(0x00000021), JMP(0x00000030),\n JZ(0x00000031), DEBUG_STOP(0xFFFFFFFF)\n");
         printf("NOP(0x00000000), DEBUG_PRINT(0x0FFFFFFF)\n");
+        printf("SHL(0x00000050), SHR(0x00000051)\n");
         printf("But,The command you are trying to execute is %08X\n", CPU_GPR[0]);
         printf("Unknown instruction encountered!\n");
         printf("So, Emulator stopped.\n");

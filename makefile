@@ -1,7 +1,7 @@
 CC := gcc
 CFLAGS := -std=c2x -Wall -Wextra -g
 TARGET := customcpu
-SRCS := main.c
+SRCS := main-switch.c
 OBJS := $(SRCS:.c=.o)
 
 ifeq ($(OS),Windows_NT)
