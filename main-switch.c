@@ -3,6 +3,7 @@
 #include <fileapi.h>
 #include <time.h>
 #include <string.h>
+#include "vBus/vbus_root.c"
 uint32_t CPU_GPR[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}; // General Purpose Registers
 uint32_t CPU_PC = 0; // Program Counter
 uint32_t CPU_SP = 0; // Stack Pointer
@@ -49,8 +50,8 @@ int RAM_init() {
 
         // 初期データをコピー（テスト用）
         uint32_t init_data[4*19] = {
-            0x00000053,0xD000FF0D,0x00000001,0x00000000,
-            0x0FFFFFFF,0x00000004,0x0000000E,0x00000002,//8
+            0x00001000,0x0000FFFF,0x00000001,0x00000000,
+            0x00001000,0x00000000,0x0000000E,0x00000002,//8
             0x00000052,0xD000FF0D,0x00000001,0x00000000,
             0x0FFFFFFF,0x00000004,0x00000000,0x00000000,//10
             0xFFFFFFFF,0x0FFFFFFF,0x00000000,0x00000000
@@ -180,6 +181,21 @@ int Run() {
         if ((int32_t)(CPU_GPR[1]) - (int32_t)(CPU_GPR[2]) < 0) {
             CPU_FLAGS |= 0b1000;
         }
+        break;
+
+    case 0x00001000: // IN
+        switch (vbus_root_main(CPU_GPR[1],CPU_GPR[2],CPU_GPR[3]))
+            {
+            case -1:
+                printf("[!]vBus is not initialized.\n");
+                break;
+            
+            case 100:
+                printf("[i]vBus initialized successfully.\n");
+                break;
+            default:
+                break;
+            }
         break;
     case 0xFFFFFFFF: // エミュレーター用強制停止命令
         printf("[!]Emulator Debugging instruction!:PC is %08X\nHow many times?:%08X\n", CPU_PC, CPU_PC / 4);

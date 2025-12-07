@@ -1,0 +1,8 @@
+CPU
+|____RAM
+|____vBusDevice
+      |__vGPIO
+      |__vNIC
+      |__vGS
+      |__etc...
+
