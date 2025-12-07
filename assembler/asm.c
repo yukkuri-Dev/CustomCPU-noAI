@@ -21,6 +21,7 @@
 #define ROL  0x00000052
 #define ROR  0x00000053
 #define CMP  0x00000100
+#define IN   0x00001000
 #define DEBUG_STOP 0xFFFFFFFF
 #define DEBUG_PRINT 0x0FFFFFFF
 #define NOP  0x00000000
@@ -52,6 +53,7 @@ InstrTableEntry instr_table[] = {
     {"DEBUG_STOP", DEBUG_STOP},
     {"DEBUG_PRINT", DEBUG_PRINT},
     {"NOP", NOP},
+    {"IN", IN},
     // 必要なら後ろにも追加
 };
 size_t instr_table_size = sizeof(instr_table)/sizeof(instr_table[0]);
