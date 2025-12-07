@@ -6,12 +6,13 @@
 uint32_t CPU_GPR[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}; // General Purpose Registers
 uint32_t CPU_PC = 0; // Program Counter
 uint32_t CPU_SP = 0; // Stack Pointer
-uint32_t CPU_FLAGS = 0; // Status Flags
+uint32_t CPU_FLAGS = 0b0000; // Status Flags//Carry,Zero,Sign,Overflow
+
 uint32_t RAM[524288];  // Simulated RAM
 #define RAM_SIZE 524288
 
 int logo(){
- printf("Custom CPU Emulator v0.2.1-Switch\n");
+ printf("Custom CPU Emulator v0.2.2-Switch\n");
  printf("\n");
  printf("      _     _            _                       ____  _   _       _____ \n");
  printf("  ___| |__ | | ___  _ __(_)_ __   ___     __   _|  _ \\| | | |     | ____|_ __ ___  _   _\n");
@@ -74,10 +75,24 @@ int Run() {
     switch (CPU_GPR[0])
     {
     case 0x00000001: // ADD
+        CPU_FLAGS |= 0b0000; // Clear Flags
         CPU_GPR[4] = CPU_GPR[1] + CPU_GPR[2];
+        if (CPU_GPR[4] < CPU_GPR[1]){
+            CPU_FLAGS |= 0b0001; // Set Carry Flag
+        }
         break;
     case 0x00000002: // SUB
+        CPU_FLAGS |= 0b0000; // Clear Flags
         CPU_GPR[4] = CPU_GPR[1] - CPU_GPR[2];
+        if (CPU_GPR[4] == 0){
+            CPU_FLAGS |= 0b0010; // Set Zero Flag
+        }
+        break;
+    case 0x00000003: //ADDC
+        CPU_GPR[4] = CPU_GPR[1] + CPU_GPR[2] + (CPU_FLAGS & 0b0001);
+        break;
+    case 0x00000004: //SUBC
+        CPU_GPR[4] = CPU_GPR[1] - CPU_GPR[2] - (CPU_FLAGS & 0b0001);
         break;
     case 0x00000010: // MOV
         if (CPU_GPR[1] == 0x00000000){
@@ -96,6 +111,12 @@ int Run() {
             printf("[!]STORE instruction warning: destination register use R0\n");
         }
         RAM[CPU_GPR[2]] = CPU_GPR[CPU_GPR[1]];
+        break;
+    case 0x00000022://MOVI
+        if (CPU_GPR[1] == 0x00000000){
+            printf("[!]MOVI instruction warning: destination register use R0\n");
+        }
+        CPU_GPR[CPU_GPR[1]] = CPU_GPR[2];
         break;
     case 0x00000030: // JMP
         if (CPU_GPR[3] == 0){
@@ -150,6 +171,15 @@ int Run() {
         break;
     case 0x00000053:// ROR
         CPU_GPR[4] = (CPU_GPR[1] >> CPU_GPR[2]) | (CPU_GPR[1] << (32 - CPU_GPR[2]));
+        break;
+    case 0x00000100: //CMP
+        CPU_FLAGS = 0; // Clear Flags
+        if (CPU_GPR[1] == CPU_GPR[2]){
+            CPU_FLAGS |= 0b0010; // Set Zero Flag
+        }
+        if ((int32_t)(CPU_GPR[1]) - (int32_t)(CPU_GPR[2]) < 0) {
+            CPU_FLAGS |= 0b1000;
+        }
         break;
     case 0xFFFFFFFF: // エミュレーター用強制停止命令
         printf("[!]Emulator Debugging instruction!:PC is %08X\nHow many times?:%08X\n", CPU_PC, CPU_PC / 4);
