@@ -20,6 +20,10 @@ vbus_list_t vbus_list;
 
 void vbus_list_init() {
     vbus_list.devices = (vbus_device_t *)malloc(sizeof(vbus_device_t) * VBUS_INIT_CAPACITY);
+    if (vbus_list.devices == NULL){
+        printf("[critical]Failed to initialize vBus device list memory.\n");
+        exit(1);
+    }
     vbus_list.capacity = VBUS_INIT_CAPACITY;
     vbus_list.count = 0;
     vbus_list_add(0x0000, "CloverTechno Inc. vBus Root Ctroler");
