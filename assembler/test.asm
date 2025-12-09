@@ -1,3 +1,10 @@
+aaaa:
+aaaa1:
+aaaa2:
+
+
+
+
 Start:
     IN IN_INIT
     IN IN_READ,R4
@@ -6,3 +13,4 @@ Start:
     ADD viuhrfpjrprgpo4re,rurwoigrojierpiojer
     vsdvsvds
     DEBUG_STOP
+    FUNC_END

@@ -56,7 +56,8 @@ InstrTableEntry instr_table[] = {
     {"NOP", 0x00000000},
     {"IN", 0x00001000},
     {"OUT", 0x00000200},
-    {"FUNC_CALL",0x00000000}
+    {"FUNC_CALL",0x00000000},
+    {"FUNC_END",    0xDEAD0001},
     // 必要なら後ろにも追加
 };
 size_t instr_table_size = sizeof(instr_table)/sizeof(instr_table[0]);
@@ -78,6 +79,7 @@ int main(int argc, char *argv[]) {
     printf("First argument: %s\n", argv[0]);
     printf("Second argument: %s\n", argv[1]);
     if (argc != 2) {
+        printf("CloverTech Assembler v0.1\n");
         printf("Usage: assembler <input.asm>\n");
         return 1;
     }
@@ -103,13 +105,38 @@ int main(int argc, char *argv[]) {
         printf("Error: 'Start:' not found in the file.\n");
         return -1;
     }
+    // ファイルポインタを先頭に戻す
+    fseek(inputFile, 0, SEEK_SET);
+    printf("File pointer reset to beginning.\n");
+
+    int label_count = 0;
+    int *get_labelmem =malloc(label_count * sizeof(int));
+    // ラベルをフェッチ
+    int line_num2 = 0;
+    while (fgets(line, sizeof(line), inputFile)) {
+        printf("Checking line %d: %s", line_num2, line);
+        line_num2++;
+        if(strstr(line, ":") != 0){
+            //ラベル発見
+            printf("[!]Label found at line %d: %s", line_num2, line);
+        }
+        if(line_num2 == NULL){
+            break;
+        }
+    }
+    fseek(inputFile, 0, SEEK_SET);
+
     //デコード開始行を表示
-    printf("Decode start line: %d\n", line_num+1);
+    printf("Decode start line: %d\n", line_num);
     while(fgets(line, sizeof(line), inputFile)) {
         line_num++;
         //ここでアセンブル処理を行う
         printf("Assembling line %d: %s\n", line_num, line);
             char *mnemonic = strtok(line, " ,\n");
+            if (mnemonic && strchr(mnemonic, ':')) {
+                // ラベルなのでスキップ
+                continue; // この行の命令処理を飛ばす
+            }
             char *op1 = strtok(NULL, " ,\n");
             char *op2 = strtok(NULL, " ,\n");
             char *op3 = strtok(NULL, " ,\n");
@@ -121,6 +148,8 @@ int main(int argc, char *argv[]) {
                 if(get_opcode(mnemonic) == 0xDEADDEAD){
                     printf("warning: mnemonic's %s is undefined in assembler\n", mnemonic);
                     machine_code[0] = (uint32_t)strtol(mnemonic, NULL, 0);
+                }else if(get_opcode(mnemonic) == 0xDEAD0001){
+                    break;
                 }else{
                     machine_code[0] = get_opcode(mnemonic); // 命令種類
                 }
@@ -129,11 +158,7 @@ int main(int argc, char *argv[]) {
                 machine_code[0] = 0x00000000; // 命令が無い場合は0に設定
             }
             printf("menemonic Done %08X\n", machine_code[0]);
-
-
-            
-            //machine_code[1] = atoi(&op1[1]);// R1（オペランド1）
-            //machine_code[2] = atoi(&op2[1]);    
+            //op1
             if (op1 != NULL){// R2（オペランド2）
                 if(get_opcode(op1) == 0xDEADDEAD){
                     machine_code[1] = (uint32_t)strtol(op1, NULL, 0);
