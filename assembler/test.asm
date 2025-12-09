@@ -1,3 +1,6 @@
 Start:
-    ADD R0 ,R1
-    JZ R0,R0,R1
+    IN IN_INIT
+    IN IN_READ,R4
+    ADD R1,1
+    JMP 3,1
+    ADD viuhrfpjrprgpo4re,rurwoigrojierpiojer
