@@ -2,48 +2,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#define ADD  0x00000001
-#define SUB  0x00000002
-#define ADDC 0x00000003
-#define SUBC 0x00000004
-#define MOV  0x000000010
-#define LOAD 0x00000020
-#define STORE 0x00000021
-#define MOVI 0x00000022
-#define JMP  0x00000030
-#define JZ   0x00000031
-#define AND  0x00000040
-#define OR   0x00000041
-#define XOR  0x00000042
-#define NOT  0x00000045
-#define SHL  0x00000050
-#define SHR  0x00000051
-#define ROL  0x00000052
-#define ROR  0x00000053
-#define CMP  0x00000100
-#define IN   0x00001000
-#define DEBUG_STOP 0xFFFFFFFF
-#define DEBUG_PRINT 0x0FFFFFFF
-#define NOP  0x00000000
-#define OUT  0x00000200
-#define CPU_GPR_R1 1
-#define CPU_GPR_R2 2
-#define CPU_GPR_R3 3
-#define CPU_GPR_R4 4
-#define CPU_GPR_R5 5 
-#define CPU_GPR_R6 6
-#define CPU_GPR_R7 7
-#define CPU_GPR_R8 8
-#define CPU_GPR_R9 9 
-#define CPU_GPR_R10 10
-#define CPU_GPR_R11 11
-#define CPU_GPR_R12 12
-#define CPU_GPR_R13 13
-#define CPU_GPR_R14 14
-#define CPU_GPR_R15 15
-#define CPU_GPR_R0 0
-#define IN_INIT 0xFFFF
-#define IN_READ 0x0000
+
 typedef struct {
     const char *mnemonic;
     uint32_t opcode;
@@ -52,51 +11,52 @@ typedef struct {
 
 InstrTableEntry instr_table[] = {
     //CPU_Register Instructions
-    {"R1",CPU_GPR_R1},
-    {"R2",CPU_GPR_R2},
-    {"R3",CPU_GPR_R3},
-    {"R4",CPU_GPR_R4},
-    {"R5",CPU_GPR_R5},
-    {"R6",CPU_GPR_R6},
-    {"R7",CPU_GPR_R7},
-    {"R8",CPU_GPR_R8},
-    {"R9",CPU_GPR_R9},
-    {"R10",CPU_GPR_R10},
-    {"R11",CPU_GPR_R11},
-    {"R12",CPU_GPR_R12},
-    {"R13",CPU_GPR_R13},
-    {"R14",CPU_GPR_R14},
-    {"R15",CPU_GPR_R15},
-    {"R0",CPU_GPR_R0},
-    {"IN_INIT", IN_INIT},
-    {"IN_READ", IN_READ},
-    {"NULL", NOP},
+    {"R1",1},
+    {"R2",2},
+    {"R3",3},
+    {"R4",4},
+    {"R5",5},
+    {"R6",6},
+    {"R7",7},
+    {"R8",8},
+    {"R9",9},
+    {"R10",10},
+    {"R11",11},
+    {"R12",12},
+    {"R13",13},
+    {"R14",14},
+    {"R15",15},
+    {"R0",0},
+    {"IN_INIT", 0xFFFF},
+    {"IN_READ", 0x0000},
+    {"NULL", 0x00000000},
     //CPU Instructions
 
-    {"ADD", ADD},
-    {"SUB", SUB},
-    {"ADDC", ADDC},
-    {"SUBC", SUBC},
-    {"MOV", MOV},
-    {"LOAD", LOAD},
-    {"STORE", STORE},
-    {"MOVI", MOVI},
-    {"JMP", JMP},
-    {"JZ", JZ},
-    {"AND", AND},
-    {"OR", OR},
-    {"XOR", XOR},
-    {"NOT", NOT},
-    {"SHL", SHL},
-    {"SHR", SHR},
-    {"ROL", ROL},
-    {"ROR", ROR},
-    {"CMP", CMP},
-    {"DEBUG_STOP", DEBUG_STOP},
-    {"DEBUG_PRINT", DEBUG_PRINT},
-    {"NOP", NOP},
-    {"IN", IN},
-    {"OUT", OUT},
+    {"ADD", 0x00000001},
+    {"SUB", 0x00000002},
+    {"ADDC", 0x00000003},
+    {"SUBC", 0x00000004},
+    {"MOV", 0x00000010},
+    {"LOAD", 0x00000020},
+    {"STORE", 0x00000021},
+    {"MOVI", 0x00000022},
+    {"JMP", 0x00000030},
+    {"JZ", 0x00000031},
+    {"AND", 0x00000040},
+    {"OR", 0x00000041},
+    {"XOR", 0x00000042},
+    {"NOT", 0x00000045},
+    {"SHL", 0x00000050},
+    {"SHR", 0x00000051},
+    {"ROL", 0x00000052},
+    {"ROR", 0x00000053},
+    {"CMP", 0x00000100},
+    {"DEBUG_STOP", 0xFFFFFFFF},
+    {"DEBUG_PRINT", 0x0FFFFFFF},
+    {"NOP", 0x00000000},
+    {"IN", 0x00001000},
+    {"OUT", 0x00000200},
+    {"FUNC_CALL",0x00000000}
     // 必要なら後ろにも追加
 };
 size_t instr_table_size = sizeof(instr_table)/sizeof(instr_table[0]);
@@ -159,11 +119,13 @@ int main(int argc, char *argv[]) {
 
             if (mnemonic != NULL){// Mnemonic（命令）
                 if(get_opcode(mnemonic) == 0xDEADDEAD){
+                    printf("warning: mnemonic's %s is undefined in assembler\n", mnemonic);
                     machine_code[0] = (uint32_t)strtol(mnemonic, NULL, 0);
                 }else{
                     machine_code[0] = get_opcode(mnemonic); // 命令種類
                 }
             }else{
+                printf("warning: mnemonic is NULL\n");
                 machine_code[0] = 0x00000000; // 命令が無い場合は0に設定
             }
             printf("menemonic Done %08X\n", machine_code[0]);

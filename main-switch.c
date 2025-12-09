@@ -125,10 +125,10 @@ int Run() {
             CPU_PC = CPU_GPR[1];
         }else if (CPU_GPR[2] == 1){
             printf("[i]JMP mode is PC Relative Jump\n");
-            CPU_PC = CPU_GPR[1] / 4;
+            CPU_PC = CPU_GPR[1] * 4;
         }else {
             printf("[!]JMP instruction warning: Unknown mode %08X\n Emulator is supported 0(Direct PC write)or 1(PC Relative Jump)\n using Relative Jump Mode!\n", CPU_GPR[3]);
-            CPU_PC = CPU_GPR[1] / 4;
+            CPU_PC = CPU_GPR[1] * 4;
         }
         break;
     case 0x00000031: // JZ
