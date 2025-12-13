@@ -3,14 +3,16 @@
 #include <fileapi.h>
 #include <time.h>
 #include <string.h>
+#include <stdlib.h>
 #include "vBus/vbus_root.c"
 uint32_t CPU_GPR[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}; // General Purpose Registers
 uint32_t CPU_PC = 0; // Program Counter
 uint32_t CPU_SP = 0; // Stack Pointer
 uint32_t CPU_FLAGS = 0b0000; // Status Flags//Carry,Zero,Sign,Overflow
 
-uint32_t RAM[524288];  // Simulated RAM
-#define RAM_SIZE 524288
+//uint32_t RAM[524288];  // Simulated RAM
+uint32_t *RAM = NULL;
+size_t RAM_SIZE = 0;
 
 int logo(){
  printf("Custom CPU Emulator v0.2.2-Switch\n");
@@ -199,7 +201,41 @@ int Run() {
             }
         break;
     case 0x00000200://OUT
-
+        switch (vbus_root_main(CPU_GPR[1],CPU_GPR[2],CPU_GPR[3]))
+            {
+            case -1:
+                printf("[!]vBus is not initialized.\n");
+                break;
+            
+            case -100 :
+                printf("[i]vBus initialized successfully.\n");
+                break;
+            default:
+                printf("[i]vBus OUT executed successfully.\n");
+                break;
+            }
+        break;
+    case 0x00000400: // FUNC_CALL
+        // スタックに現在のPCを保存
+        int Stack_Address = RAM_SIZE - 16; // スタックの開始アドレス（RAMの最後から16ワード分をスタックに使用）
+        if (CPU_SP >= RAM_SIZE - 16) {
+            printf("[!]Stack Overflow detected! SP: %08X\n", CPU_SP);
+            return -1;
+        }
+        RAM[Stack_Address + CPU_SP] = CPU_PC;
+        CPU_SP += 1; // スタックポインタを更新
+        CPU_PC = CPU_GPR[1]; // 関数のアドレスにジャンプ
+        break;
+    case 0x00000401: // FUNC_END
+        // スタックからPCを復元
+        if (CPU_SP <= 0) {
+            printf("[!]Stack Underflow detected! SP: %08X\n", CPU_SP);
+            return -1;
+        }
+        CPU_SP -= 1; // スタックポインタを更新
+        int Stack_Address_End = RAM_SIZE - 16; // スタックの開始アドレス（RAMの最後から16ワード分をスタックに使用）
+        CPU_PC = RAM[Stack_Address_End + CPU_SP]; // 保存されていたPCに戻る
+        break;
     case 0xFFFFFFFF: // エミュレーター用強制停止命令
         printf("[!]Emulator Debugging instruction!:PC is %08X\nHow many times?:%08X\n", CPU_PC, CPU_PC / 4);
         printf("====[What's happen?]====\n");
@@ -229,7 +265,32 @@ int Run() {
     return 0;
 }
 
-int main() {
+int main(int argc, char *argv[]) {
+    if (argc < 2) {
+        printf("Custom CPU Emulator v0.2.2-Switch\n");
+        printf("Usage: emulator <RAM size in bytes (e.g., 512k, 2m, 1048576b)>\n");
+        return 1;
+    }
+    int Set_RAM_size = atoi(argv[1]);
+    if (strstr(argv[1] , "k") != NULL || strstr(argv[1], "K") != NULL ){
+        RAM_SIZE = Set_RAM_size * 1024;
+    }else if (strstr(argv[1], "m") != NULL || strstr(argv[1], "M") != NULL ){
+        RAM_SIZE = Set_RAM_size * 1024 * 1024;
+    }else if (strstr(argv[1], "b") != NULL || strstr(argv[1], "B") != NULL ){
+        RAM_SIZE = atoi(argv[1]);
+    }else if (Set_RAM_size > 0 || Set_RAM_size == NULL){
+        printf("Using default RAM size.\n");
+        RAM_SIZE = 524288; // Default 2MB
+    }else{
+        printf("Invalid RAM size argument. Using default size.\n");
+        return 1;
+    }
+    printf("RAMsize : %d bytes\n", RAM_SIZE * sizeof(uint32_t));
+    RAM = (uint32_t *)malloc(RAM_SIZE * sizeof(uint32_t));
+    if (RAM == NULL) {
+        fprintf(stderr, "Failed to allocate memory for RAM\n");
+        return 1;
+    }
     clock_t start_time;
     start_time = clock();
     RAM_init();
@@ -238,8 +299,9 @@ int main() {
         if (Run() == -1) {
             break;
         }
-        printf("PC:%08X(%08X)|Reg0: %08X|Reg1: %08X|Reg2: %08X|Reg3: %08X|Reg4(Output): %08X\n", CPU_PC,CPU_PC / 4, CPU_GPR[0], CPU_GPR[1], CPU_GPR[2], CPU_GPR[3], CPU_GPR[4]);
+        //printf("PC:%08X(%08X)|Reg0: %08X|Reg1: %08X|Reg2: %08X|Reg3: %08X|Reg4(Output): %08X\n", CPU_PC,CPU_PC / 4, CPU_GPR[0], CPU_GPR[1], CPU_GPR[2], CPU_GPR[3], CPU_GPR[4]);
     }
+    free(RAM);
     printf("Emulator stopped.\n");
     printf("Total execution time: %.2f seconds\n", (clock() - start_time) / (double)CLOCKS_PER_SEC);
     return 0;

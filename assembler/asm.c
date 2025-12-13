@@ -56,8 +56,9 @@ InstrTableEntry instr_table[] = {
     {"NOP", 0x00000000},
     {"IN", 0x00001000},
     {"OUT", 0x00000200},
-    {"FUNC_CALL",0x00000000},
-    {"FUNC_END",    0xDEAD0001},
+    {"FUNC_CALL",0x00000400},
+    {"FUNC_END", 0x00000401},
+    {"END_ASM", 0xDEAD0001},
     // 必要なら後ろにも追加
 };
 size_t instr_table_size = sizeof(instr_table)/sizeof(instr_table[0]);
@@ -109,25 +110,53 @@ int main(int argc, char *argv[]) {
     fseek(inputFile, 0, SEEK_SET);
     printf("File pointer reset to beginning.\n");
 
+    // ラベル情報を格納する構造体と配列
+    typedef struct {
+        char name[64];
+        int address;
+    } Label;
+
+    Label labels[256];
     int label_count = 0;
-    int *get_labelmem =malloc(label_count * sizeof(int));
-    // ラベルをフェッチ
+
+    // 1st pass: ラベルを収集
+    int current_address = 0;
     int line_num2 = 0;
+    // Startラベルまでスキップ
     while (fgets(line, sizeof(line), inputFile)) {
-        printf("Checking line %d: %s", line_num2, line);
-        line_num2++;
-        if(strstr(line, ":") != 0){
-            //ラベル発見
-            printf("[!]Label found at line %d: %s", line_num2, line);
-        }
-        if(line_num2 == NULL){
+        if (strcmp(line, search_str) == 0) {
             break;
+        }
+    }
+    while (fgets(line, sizeof(line), inputFile)) {
+        line_num2++;
+        char *colon = strchr(line, ':');
+        if (colon != NULL) {
+            // ラベル名を抽出
+            size_t len = colon - line;
+            if (len < sizeof(labels[0].name)) {
+                strncpy(labels[label_count].name, line, len);
+                labels[label_count].name[len] = '\0';
+                labels[label_count].address = current_address;
+                printf("[!]Label found: %s at address %d (line %d)\n", labels[label_count].name, current_address, line_num2);
+                label_count++;
+            }
+        } else if (line[0] != '\n' && line[0] != ';') {
+            // 空行やコメントでなければ命令としてカウント
+            current_address += 4 * sizeof(uint32_t); // 4ワード分進める
         }
     }
     fseek(inputFile, 0, SEEK_SET);
 
     //デコード開始行を表示
     printf("Decode start line: %d\n", line_num);
+    // Startラベルまで読み飛ばす（ここでファイルポインタをStartの直後に合わせる）
+    while (fgets(line, sizeof(line), inputFile)) {
+        if (strcmp(line, search_str) == 0) {
+            break;
+        }
+    }
+
     while(fgets(line, sizeof(line), inputFile)) {
         line_num++;
         //ここでアセンブル処理を行う
@@ -140,6 +169,13 @@ int main(int argc, char *argv[]) {
             char *op1 = strtok(NULL, " ,\n");
             char *op2 = strtok(NULL, " ,\n");
             char *op3 = strtok(NULL, " ,\n");
+
+            // オペランドがラベル名の場合、アドレスに変換
+            for (int i = 0; i < label_count; ++i) {
+                if (op1 && strcmp(op1, labels[i].name) == 0) op1 = (char *)labels[i].address;
+                if (op2 && strcmp(op2, labels[i].name) == 0) op2 = (char *)labels[i].address;
+                if (op3 && strcmp(op3, labels[i].name) == 0) op3 = (char *)labels[i].address;
+            }
             printf("Mnemonic: %s, Operand1: %s, Operand2: %s,Operand3: %s\n", mnemonic, op1, op2,op3);
             uint32_t machine_code[4];
             machine_code[0] = get_opcode(mnemonic); // 命令種類
