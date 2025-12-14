@@ -191,7 +191,7 @@ int main(int argc, char *argv[]) {
                 // ラベルなのでスキップ
                 continue; // この行の命令処理を飛ばす
             }else if (mnemonic && strchr(mnemonic, ';')) {
-                // ラベルなのでスキップ
+                // コメントなのでスキップ
                 continue; // この行の命令処理を飛ばす
             } else if (mnemonic == NULL) {
                 // mnemonicがnullだったらスキップ
