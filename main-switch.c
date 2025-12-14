@@ -4,7 +4,7 @@
 #include <time.h>
 #include <string.h>
 #include <stdlib.h>
-#include "vBus/vbus_root.c"
+#include "vBus/vbus_root.h"      // ← こちらを追加
 uint32_t CPU_GPR[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}; // General Purpose Registers
 uint32_t CPU_PC = 0; // Program Counter
 uint32_t CPU_SP = 0; // Stack Pointer
@@ -52,7 +52,7 @@ int RAM_init() {
 
         // 初期データをコピー（テスト用）
         uint32_t init_data[4*19] = {
-            0x00001000,0x0000FFFF,0x00000001,0x00000000,
+            0x00000030,0x00000000,0x00000000,0x00000000,
             0x00001000,0x00000000,0x00000002,0x00000000,//8
             0x0FFFFFFF,0x00000004,0x00000001,0x00000000,
             0x0FFFFFFF,0x00000004,0x00000000,0x00000000,//10
@@ -122,15 +122,24 @@ int Run() {
         CPU_GPR[CPU_GPR[1]] = CPU_GPR[2];
         break;
     case 0x00000030: // JMP
+        {
+        static int jmp_mode_printed = 0;
         if (CPU_GPR[2] == 0){
-            printf("[i]JMP mode is Direct PC write\n");
+            if (!jmp_mode_printed) {
+                printf("[i]JMP mode is Direct PC write\n");
+                jmp_mode_printed = 1;
+            }
             CPU_PC = CPU_GPR[1];
         }else if (CPU_GPR[2] == 1){
-            printf("[i]JMP mode is PC Relative Jump\n");
+            if (!jmp_mode_printed) {
+                printf("[i]JMP mode is PC Relative Jump\n");
+                jmp_mode_printed = 1;
+            }
             CPU_PC = CPU_GPR[1] * 4;
         }else {
             printf("[!]JMP instruction warning: Unknown mode %08X\n Emulator is supported 0(Direct PC write)or 1(PC Relative Jump)\n using Relative Jump Mode!\n", CPU_GPR[3]);
             CPU_PC = CPU_GPR[1] * 4;
+        }
         }
         break;
     case 0x00000031: // JZ
@@ -186,34 +195,45 @@ int Run() {
         break;
 
     case 0x00001000: // IN
-        switch (vbus_root_main(CPU_GPR[1],CPU_GPR[2],CPU_GPR[3]))
-            {
+        {
+            // IN uses register-based operands (like MOV/LOAD/STORE):
+            // operand words are register indices, and we pass the register contents to vBus.
+            uint32_t mode = CPU_GPR[CPU_GPR[1] & 0xF];
+            uint32_t mount = CPU_GPR[CPU_GPR[2] & 0xF];
+            uint32_t data = CPU_GPR[CPU_GPR[3] & 0xF];
+            int res = vbus_root_main((uint16_t)mode, (uint16_t)mount, (uint16_t)data);
+            switch (res) {
             case -1:
                 printf("[!]vBus is not initialized.\n");
                 break;
-            
-            case -100 :
+            case -100:
                 printf("[i]vBus initialized successfully.\n");
                 break;
             default:
-                CPU_GPR[4] = vbus_root_main(CPU_GPR[1],CPU_GPR[2],CPU_GPR[3]);
+                CPU_GPR[4] = res;
                 break;
             }
+        }
         break;
     case 0x00000200://OUT
-        switch (vbus_root_main(CPU_GPR[1],CPU_GPR[2],CPU_GPR[3]))
+        {
+            uint32_t mode = CPU_GPR[CPU_GPR[1] & 0xF];
+            uint32_t mount = CPU_GPR[CPU_GPR[2] & 0xF];
+            uint32_t data = CPU_GPR[CPU_GPR[3] & 0xF];
+            switch (vbus_root_out_main((uint16_t)mode, (uint16_t)mount, (uint16_t)data))
             {
             case -1:
                 printf("[!]vBus is not initialized.\n");
                 break;
             
-            case -100 :
-                printf("[i]vBus initialized successfully.\n");
+            case -10 :
+                printf("[!]vBus Write Error.\n");
                 break;
             default:
                 printf("[i]vBus OUT executed successfully.\n");
                 break;
             }
+        }
         break;
     case 0x00000400: // FUNC_CALL
         // スタックに現在のPCを保存
@@ -294,6 +314,10 @@ int main(int argc, char *argv[]) {
     clock_t start_time;
     start_time = clock();
     RAM_init();
+    // Auto-initialize vBus so devices (fakevgq, counters) start and window appears
+    // Initialize vBus devices early to ensure devices (fakevgq, counters) are ready
+    vbus_list_init();
+    VBUS_MODE = 1;
     while (1==1){     
         fetchRAM();
         if (Run() == -1) {

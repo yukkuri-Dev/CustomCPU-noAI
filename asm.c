@@ -78,13 +78,12 @@ uint32_t get_opcode(const char *mnemonic) {
 int main(int argc, char *argv[]) {
     printf("Argument count: %d\n", argc);
     printf("First argument: %s\n", argv[0]);
+    printf("Second argument: %s\n", argv[1]);
     if (argc != 2) {
         printf("CloverTech Assembler v0.1\n");
         printf("Usage: assembler <input.asm>\n");
         return 1;
     }
-
-    printf("Second argument: %s\n", argv[1]);
 
     FILE *inputFile = fopen(argv[1], "r");
     if (!inputFile) {
@@ -131,28 +130,12 @@ int main(int argc, char *argv[]) {
     }
     while (fgets(line, sizeof(line), inputFile)) {
         line_num2++;
-        // Skip empty lines and comment lines during label scan
-        char *p = line;
-        while (*p == ' ' || *p == '\t') p++;
-        if (*p == '\n' || *p == '\0' || *p == ';') {
-            continue;
-        }
-
-        // Treat as a label only if ':' appears before any whitespace
-        char *colon = strchr(p, ':');
-        if (colon != NULL) {
-            for (char *q = p; q < colon; ++q) {
-                if (*q == ' ' || *q == '\t') {
-                    colon = NULL;
-                    break;
-                }
-            }
-        }
+        char *colon = strchr(line, ':');
         if (colon != NULL) {
             // ラベル名を抽出
-            size_t len = colon - p;
+            size_t len = colon - line;
             if (len < sizeof(labels[0].name)) {
-                strncpy(labels[label_count].name, p, len);
+                strncpy(labels[label_count].name, line, len);
                 labels[label_count].name[len] = '\0';
                 labels[label_count].address = current_address;
                 printf("[!]Label found: %s at address %d (line %d)\n", labels[label_count].name, current_address, line_num2);
@@ -160,8 +143,7 @@ int main(int argc, char *argv[]) {
             }
         } else if (line[0] != '\n' && line[0] != ';') {
             // 空行やコメントでなければ命令としてカウント
-            // 1 instruction = 4 words, and PC is a word-index.
-            current_address += 4;
+            current_address += 4 * sizeof(uint32_t); // 4ワード分進める
         }
     }
     fseek(inputFile, 0, SEEK_SET);
@@ -173,13 +155,6 @@ int main(int argc, char *argv[]) {
         if (strcmp(line, search_str) == 0) {
             break;
         }
-    }
-
-    // Always recreate output so we don't append old programs.
-    FILE *fp_out = fopen("game.bin", "wb");
-    if (!fp_out) {
-        printf("Failed to open output file game.bin\n");
-        return 1;
     }
 
     while(fgets(line, sizeof(line), inputFile)) {
@@ -200,6 +175,13 @@ int main(int argc, char *argv[]) {
             char *op1 = strtok(NULL, " ,\n");
             char *op2 = strtok(NULL, " ,\n");
             char *op3 = strtok(NULL, " ,\n");
+
+            // オペランドがラベル名の場合、アドレスに変換
+            for (int i = 0; i < label_count; ++i) {
+                if (op1 && strcmp(op1, labels[i].name) == 0) op1 = (char *)labels[i].address;
+                if (op2 && strcmp(op2, labels[i].name) == 0) op2 = (char *)labels[i].address;
+                if (op3 && strcmp(op3, labels[i].name) == 0) op3 = (char *)labels[i].address;
+            }
             printf("Mnemonic: %s, Operand1: %s, Operand2: %s,Operand3: %s\n", mnemonic, op1, op2,op3);
             uint32_t machine_code[4];
             machine_code[0] = get_opcode(mnemonic); // 命令種類
@@ -218,49 +200,52 @@ int main(int argc, char *argv[]) {
                 machine_code[0] = 0x00000000; // 命令が無い場合は0に設定
             }
             printf("menemonic Done %08X\n", machine_code[0]);
-            // operands (label > known token > immediate)
-            const char *ops[3] = {op1, op2, op3};
-            for (int op_idx = 0; op_idx < 3; ++op_idx) {
-                const char *tok = ops[op_idx];
-                uint32_t value = 0;
-                if (tok == NULL) {
-                    value = 0;
-                } else {
-                    int resolved = 0;
-                    for (int i = 0; i < label_count; ++i) {
-                        if (strcmp(tok, labels[i].name) == 0) {
-                            value = (uint32_t)labels[i].address;
-                            resolved = 1;
-                            break;
-                        }
-                    }
-                    if (!resolved) {
-                        uint32_t op = get_opcode(tok);
-                        if (op != 0xDEADDEAD) {
-                            value = op;
-                        } else {
-                            value = (uint32_t)strtol(tok, NULL, 0);
-                        }
-                    }
+            //op1
+            if (op1 != NULL){// R2（オペランド2）
+                if(get_opcode(op1) == 0xDEADDEAD){
+                    machine_code[1] = (uint32_t)strtol(op1, NULL, 0);
+                }else{
+                    machine_code[1] = get_opcode(op1); // オペランド1
                 }
-                machine_code[1 + op_idx] = value;
+            }else{
+                machine_code[1] = 0x00000000; // オペランド1が無い場合は0に設定
             }
             printf("op1 Done %08X\n", machine_code[1]);
+            //op2
+            if(op2 != NULL){
+                if(get_opcode(op2) == 0xDEADDEAD){
+                    machine_code[2] = (uint32_t)strtol(op2, NULL, 0);
+                }else{
+                    machine_code[2] = get_opcode(op2); // オペランド2
+                }
+            }else{
+                machine_code[2] = 0x00000000; // オペランド2が無い場合は0に設定
+            }
             printf("op2 Done %08X\n", machine_code[2]);
+            //op3
+            if (op3 != NULL){
+                if(get_opcode(op3) == 0xDEADDEAD){
+                    machine_code[3] = (uint32_t)strtol(op3, NULL, 0);
+                }else{
+                    machine_code[3] = get_opcode(op3); // オペランド3
+                }
+            }else{
+                machine_code[3] = 0x00000000; // オペランド3が無い場合は0に設定
+            }
             
 
             printf("op3 Done %08X\n", machine_code[3]);
             printf("Machine code: %08X %08X %08X %08X\n", machine_code[0], machine_code[1], machine_code[2], machine_code[3]);
             //バイナリファイルに書き込み
+            FILE *fp_out = fopen("game.bin", "ab");
             fwrite(machine_code, sizeof(uint32_t), 4, fp_out);
+            fclose(fp_out);
             machine_code[0] =0;
             machine_code[1] =0;
             machine_code[2] =0;
             machine_code[3] =0;
     }   
+    FILE *fp_out = fopen("game.bin", "ab");
     uint32_t STOP = 0xFFFFFFFF;
     fwrite(&STOP, sizeof(uint32_t), 1, fp_out);
-
-    fclose(fp_out);
-    fclose(inputFile);
 }
