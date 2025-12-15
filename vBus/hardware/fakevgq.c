@@ -3,10 +3,10 @@
 #include <stdio.h>
 #include "fakevgq.h"
 
-// Simple fake VGA: memory is 32x32 cells (1024 words). Each word is a color index.
-#define VG_WIDTH_CELLS 32
-#define VG_HEIGHT_CELLS 32
-#define CELL_PIX 10
+// Simple fake VGA: memory is 128x128 cells (16384 words). Each word is a color index.
+#define VG_WIDTH_CELLS 64
+#define VG_HEIGHT_CELLS 64
+#define CELL_PIX 5
 #define WIN_WIDTH (VG_WIDTH_CELLS * CELL_PIX)
 #define WIN_HEIGHT (VG_HEIGHT_CELLS * CELL_PIX)
 

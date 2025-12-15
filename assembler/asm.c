@@ -56,6 +56,8 @@ InstrTableEntry instr_table[] = {
     {"NOP", 0x00000000},
     {"IN", 0x00001000},
     {"OUT", 0x00000200},
+    {"CALL",0x00000400},
+    {"RET", 0x00000401},
     {"FUNC_CALL",0x00000400},
     {"FUNC_END", 0x00000401},
     {"END_ASM", 0xDEAD0001},
@@ -63,7 +65,17 @@ InstrTableEntry instr_table[] = {
 };
 size_t instr_table_size = sizeof(instr_table)/sizeof(instr_table[0]);
 
+// 追加: ラベル関連の型を main の前に移動（main 内で先に使っているため）
+typedef struct {
+    char name[64];
+    int address;
+} Label;
 
+typedef struct {
+    char name[128];
+    char filename[256];
+    int line_number;
+} installed_label;
 
 uint32_t get_opcode(const char *mnemonic) {
     for (size_t i = 0; i < instr_table_size; ++i) {
@@ -93,6 +105,7 @@ int main(int argc, char *argv[]) {
     }
     char line[256]; // 1行を格納するバッファ
     const char *search_str = "Start:\n"; // 探したい文字列
+    const char *search_subroutine_install = "#install\n"; // 探したい文字列
     int line_num = 0;
     int flag_found = 0;
     while (fgets(line, sizeof(line), inputFile)) {
@@ -102,6 +115,62 @@ int main(int argc, char *argv[]) {
             flag_found = 1;
             break;
         }
+        if (strncmp(line, search_subroutine_install, 8) == 0) {
+            printf("Subroutine install directive found at line %d: %s", line_num, line);
+            const char *line_ptr = line + 8; // "#install"の後ろから開始
+            while (*line_ptr == ' ' || *line_ptr == '\t') {
+                line_ptr++; // 空白とタブをスキップ
+            }
+            // 末尾の改行/スペースをトリム
+            char filename[260];
+            size_t len = strlen(line_ptr);
+            while (len > 0 && (line_ptr[len-1] == '\n' || line_ptr[len-1] == '\r' || line_ptr[len-1] == ' ' || line_ptr[len-1] == '\t')) {
+                len--;
+            }
+            if (len >= sizeof(filename)) len = sizeof(filename) - 1;
+            memcpy(filename, line_ptr, len);
+            filename[len] = '\0';
+
+            FILE *INSTALL_SUBROUTINE_ENTRY = fopen(filename, "r");
+            if (!INSTALL_SUBROUTINE_ENTRY) {
+                printf("Failed to open subroutine install file: %s\n", filename);
+                return 1;
+            }
+            printf("Subroutine install file opened successfully: %s\n", filename);
+            while(fgets(line, sizeof(line), INSTALL_SUBROUTINE_ENTRY)) {
+                if (line[0] == ';' || line[0] == '\n') {
+                    continue; // コメント行と空行をスキップ
+                }
+                printf("Subroutine line: %s", line);
+                // strtok を正しく使う（最初のトークン取得から）
+                char *token = strtok(line, " ,\n");
+                char *label_dec = NULL;
+                char *address_dec = NULL;
+                if (token != NULL) {
+                    label_dec = token;
+                    address_dec = strtok(NULL, " ,\n");
+                }
+                printf("Subroutine Label: %s, Address: %s\n", label_dec ? label_dec : "NULL", address_dec ? address_dec : "NULL");
+                installed_label inst_lbl; // 変数名を型名と衝突しないよう変更
+                if (label_dec != NULL && address_dec != NULL) {
+                    strncpy(inst_lbl.name, label_dec, sizeof(inst_lbl.name)-1);
+                    inst_lbl.name[sizeof(inst_lbl.name)-1] = '\0';
+                    strncpy(inst_lbl.filename, filename, sizeof(inst_lbl.filename)-1);
+                    inst_lbl.filename[sizeof(inst_lbl.filename)-1] = '\0';
+                    inst_lbl.line_number = atoi(address_dec);
+                    printf("Installed Subroutine: %s at address %d from file %s\n", inst_lbl.name, inst_lbl.line_number, inst_lbl.filename);
+                } else {
+                    printf("Warning: Invalid subroutine line format: %s", line);
+                }
+            }
+
+
+
+
+
+            fclose(INSTALL_SUBROUTINE_ENTRY);
+            
+        }
     }
     if (flag_found == 0) {
         printf("Error: 'Start:' not found in the file.\n");
@@ -110,20 +179,20 @@ int main(int argc, char *argv[]) {
     // ファイルポインタを先頭に戻す
     fseek(inputFile, 0, SEEK_SET);
     printf("File pointer reset to beginning.\n");
+    
 
     // ラベル情報を格納する構造体と配列
-    typedef struct {
-        char name[64];
-        int address;
-    } Label;
-
     Label labels[256];
+    installed_label installed_labels[256];
     int label_count = 0;
 
     // 1st pass: ラベルを収集
     int current_address = 0;
     int line_num2 = 0;
+
+
     // Startラベルまでスキップ
+    
     while (fgets(line, sizeof(line), inputFile)) {
         if (strcmp(line, search_str) == 0) {
             break;
@@ -137,7 +206,6 @@ int main(int argc, char *argv[]) {
         if (*p == '\n' || *p == '\0' || *p == ';') {
             continue;
         }
-
         // Treat as a label only if ':' appears before any whitespace
         char *colon = strchr(p, ':');
         if (colon != NULL) {
@@ -163,7 +231,10 @@ int main(int argc, char *argv[]) {
             // 1 instruction = 4 words, and PC is a word-index.
             current_address += 4;
         }
-    }
+
+        
+
+    } //fetching labels loop end
     fseek(inputFile, 0, SEEK_SET);
 
     //デコード開始行を表示
@@ -185,7 +256,7 @@ int main(int argc, char *argv[]) {
     while(fgets(line, sizeof(line), inputFile)) {
         line_num++;
         //ここでアセンブル処理を行う
-        printf("Assembling line %d: %s\n", line_num, line);
+        //printf("Assembling line %d: %s\n", line_num, line);
             char *mnemonic = strtok(line, " ,\n");
             if (mnemonic && strchr(mnemonic, ':')) {
                 // ラベルなのでスキップ
@@ -200,7 +271,7 @@ int main(int argc, char *argv[]) {
             char *op1 = strtok(NULL, " ,\n");
             char *op2 = strtok(NULL, " ,\n");
             char *op3 = strtok(NULL, " ,\n");
-            printf("Mnemonic: %s, Operand1: %s, Operand2: %s,Operand3: %s\n", mnemonic, op1, op2,op3);
+            //printf("Mnemonic: %s, Operand1: %s, Operand2: %s,Operand3: %s\n", mnemonic, op1, op2,op3);
             uint32_t machine_code[4];
             machine_code[0] = get_opcode(mnemonic); // 命令種類
 
@@ -217,7 +288,7 @@ int main(int argc, char *argv[]) {
                 printf("warning: mnemonic is NULL\n");
                 machine_code[0] = 0x00000000; // 命令が無い場合は0に設定
             }
-            printf("menemonic Done %08X\n", machine_code[0]);
+            //printf("menemonic Done %08X\n", machine_code[0]);
             // operands (label > known token > immediate)
             const char *ops[3] = {op1, op2, op3};
             for (int op_idx = 0; op_idx < 3; ++op_idx) {
@@ -231,7 +302,7 @@ int main(int argc, char *argv[]) {
                         if (strcmp(tok, labels[i].name) == 0) {
                             value = (uint32_t)labels[i].address;
                             resolved = 1;
-                            break;
+                            break;//ラベル格納
                         }
                     }
                     if (!resolved) {
@@ -245,12 +316,10 @@ int main(int argc, char *argv[]) {
                 }
                 machine_code[1 + op_idx] = value;
             }
-            printf("op1 Done %08X\n", machine_code[1]);
-            printf("op2 Done %08X\n", machine_code[2]);
-            
-
-            printf("op3 Done %08X\n", machine_code[3]);
-            printf("Machine code: %08X %08X %08X %08X\n", machine_code[0], machine_code[1], machine_code[2], machine_code[3]);
+            //printf("op1 Done %08X,", machine_code[1]);
+            //printf("op2 Done %08X,", machine_code[2]);
+            //printf("op3 Done %08X\n", machine_code[3]);
+            //printf("Machine code: %08X %08X %08X %08X\n", machine_code[0], machine_code[1], machine_code[2], machine_code[3]);
             //バイナリファイルに書き込み
             fwrite(machine_code, sizeof(uint32_t), 4, fp_out);
             machine_code[0] =0;
@@ -263,4 +332,21 @@ int main(int argc, char *argv[]) {
 
     fclose(fp_out);
     fclose(inputFile);
+    char output_filename[260];
+    snprintf(output_filename, sizeof(output_filename), "%s.list", argv[1]);
+    FILE *subp_out = fopen(output_filename, "a");
+    if (!subp_out) {
+        printf("Failed to open output file %s.list\n", argv[1]);
+        return 1;
+    }
+    fprintf(subp_out, ";This file is generated by CloverTech Assmbler.\n");
+    fprintf(subp_out, ";This file is a list of labels and their addresses.\n");
+    fprintf(subp_out, ";Format: Label:,Address\n");
+    fprintf(subp_out, ";using for example, call subroutine with external program.\n");
+    for (int i = 0; i < label_count; ++i) {
+        fprintf(subp_out, "%s:,%d\n", labels[i].name, labels[i].address);
+    }
+    fclose(subp_out);
+    return 0;
+
 }

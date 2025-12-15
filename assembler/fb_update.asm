@@ -1,3 +1,5 @@
+#install fb_update.asm.list
+; Framebuffer update test for fakevgq device
 Start:
     ; Register-based IN/OUT:
     ;   IN  op1,op2,op3  => mode=R[op1], mount=R[op2], data=R[op3]
@@ -7,11 +9,10 @@ Start:
 
     ; NOTE: CPU_GPR[0..3] are overwritten by fetch each instruction.
     ; Use R5+ to keep values across instructions.
+    JMP Loop
 
-    MOVI R5,0xFFFF    ; MODE = INIT
-    MOVI R6,0x0000
     MOVI R7,0x0000
-    IN R5,R6,R7
+    IN IN_INIT,0x0000,0x0000
 
     MOVI R5,0x0000    ; MODE = WRITE
     MOVI R6,0x0200    ; DEVICE = fakevgq
